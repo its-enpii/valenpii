@@ -23,6 +23,9 @@ export class BloomController {
     this.isMouseDown = false;
     this.lastMouseY = 0;
     this.celebrated = false;
+    this.touchCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    this.lockCenter = { x: 0, y: 0 };
+    this.isLocked = false;
   }
 
   async init() {
@@ -125,9 +128,9 @@ export class BloomController {
         t2.clientX - t1.clientX,
         t2.clientY - t1.clientY,
       );
-      const centerX = (t1.clientX + t2.clientX) / 2;
-      const centerY = (t1.clientY + t2.clientY) / 2;
-      this.prepareBloomParticles(centerX, centerY);
+      this.touchCenter.x = (t1.clientX + t2.clientX) / 2;
+      this.touchCenter.y = (t1.clientY + t2.clientY) / 2;
+      this.prepareBloomParticles(this.touchCenter.x, this.touchCenter.y);
     }
   }
 
@@ -172,6 +175,9 @@ export class BloomController {
         t2.clientY - t1.clientY,
       );
 
+      this.touchCenter.x = (t1.clientX + t2.clientX) / 2;
+      this.touchCenter.y = (t1.clientY + t2.clientY) / 2;
+
       this.bloomFactor = Math.min(
         1.0,
         Math.max(0, (currentDistance / this.initialDistance - 1) * 0.8), // Reduced to 0.8 for smooth bloom
@@ -207,6 +213,13 @@ export class BloomController {
 
       const opacity = (f - 0.8) / 0.2;
       bloomMsg.style.opacity = Math.min(1, opacity);
+
+      // LOCKING LOGIC: If full bloom, use the locked center. Otherwise follow fingers.
+      const displayX = this.isLocked ? this.lockCenter.x : this.touchCenter.x;
+      const displayY = this.isLocked ? this.lockCenter.y : this.touchCenter.y;
+
+      bloomMsg.style.left = `${displayX}px`;
+      bloomMsg.style.top = `${displayY}px`;
       bloomMsg.style.transform = `translate(-50%, -50%) scale(${1 + (f - 0.8)})`;
     }
   }
@@ -226,6 +239,12 @@ export class BloomController {
     // CELEBRATION BURST (One-time pop when full)
     if (this.bloomFactor > 0.99 && !this.celebrated) {
       this.celebrated = true;
+
+      // LOCK POSITION for UI text
+      this.isLocked = true;
+      this.lockCenter.x = this.touchCenter.x;
+      this.lockCenter.y = this.touchCenter.y;
+
       gsap.to(this.bloomParticles, {
         bloomMix: 1.5, // Over-bloom for a moment
         duration: 0.3,
@@ -235,6 +254,7 @@ export class BloomController {
       });
     } else if (this.bloomFactor < 0.9) {
       this.celebrated = false;
+      this.isLocked = false;
     }
 
     // Continuous UI update based on bloomFactor
@@ -245,6 +265,7 @@ export class BloomController {
     if (this.active) {
       this.active = false;
       this.bloomFactor = 0; // Explicitly reset factor
+      this.isLocked = false; // Reset lock
 
       // Smoothly fade the mix to zero
       gsap.to(this.bloomParticles, {

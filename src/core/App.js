@@ -85,7 +85,7 @@ export class App {
   }
 
   render() {
-    const dt = this.clock.getDelta();
+    const dt = Math.min(0.05, this.clock.getDelta());
 
     this.shakeController.update(dt);
     this.bloomController.update(dt);

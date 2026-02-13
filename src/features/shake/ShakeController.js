@@ -84,13 +84,25 @@ export class ShakeController {
 
   onDeviceMotion(e) {
     let mag = 0;
-    if (e.acceleration && e.acceleration.x !== null) {
-      const acc = e.acceleration;
-      mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-    } else if (e.accelerationIncludingGravity) {
-      const acc = e.accelerationIncludingGravity;
-      const rawMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-      mag = Math.abs(rawMag - 9.8);
+
+    // Check linear acceleration (most precise)
+    const acc = e.acceleration;
+    if (acc && typeof acc.x === "number" && acc.x !== null) {
+      // Use max absolute component for better axis-independent sensitivity
+      mag = Math.max(Math.abs(acc.x), Math.abs(acc.y), Math.abs(acc.z));
+    }
+    // Fallback to acceleration with gravity
+    else if (e.accelerationIncludingGravity) {
+      const accG = e.accelerationIncludingGravity;
+      if (typeof accG.x === "number") {
+        // Look for deviation from gravity on ANY axis
+        const dx = Math.abs(accG.x);
+        const dy = Math.abs(accG.y);
+        const dz = Math.abs(accG.z);
+        // We look for any component that significantly changes
+        // Since gravity is 9.8 on ONE axis, we look for values far from 0 OR far from 9.8
+        mag = Math.max(dx, dy, Math.abs(dz - 9.8));
+      }
     }
     this.handleShake(mag);
   }
@@ -98,11 +110,19 @@ export class ShakeController {
   handleShake(magnitude) {
     if (!this.isReady) return;
 
+    // Hysteresis logic:
+    // 8.0 to START (aggressive enough)
+    // 3.0 to SUSTAIN (keep it alive during slow parts of shake)
+    const sustainThreshold = 3.0;
+
     if (magnitude > this.shakeThreshold) {
       this.lastShakeTime = Date.now();
       if (!this.isShaking) {
         this.startShaking();
       }
+    } else if (this.isShaking && magnitude > sustainThreshold) {
+      // Keep resetting the timer while movement is still detected
+      this.lastShakeTime = Date.now();
     }
   }
 
@@ -235,13 +255,7 @@ export class ShakeController {
         p.x += Math.sin(Date.now() * 0.001 + p.y * 0.01) * 0.2;
         p.y += Math.cos(Date.now() * 0.001 + p.x * 0.01) * 0.2;
 
-        // 3. Soft Boundary Pull
-        const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-        if (dist > 2500) {
-          p.x *= 0.995;
-          p.y *= 0.995;
-          p.z *= 0.995;
-        }
+        // Boundaries removed to allow particles to escape and keep display clean
       }
     }
   }
