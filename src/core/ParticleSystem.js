@@ -212,31 +212,33 @@ export class ParticleSystem {
       }
 
       // BASE PHYSICS (The "Chaos" drift)
-      if (p.role === "background") {
-        const friction = 0.985;
+      if (p.state === "chaos") {
+        const friction = 0.992; // Phase 63: Reduced friction for better inertia (0.985 -> 0.992)
         p.vx *= friction;
         p.vy *= friction;
         p.vz *= friction;
 
-        // Phase 56: Minimum Vitality Check
-        const speedSq = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz;
-        if (speedSq < 1600) {
-          // min speed ~40
-          const boost = 1.05;
-          p.vx *= boost;
-          p.vy *= boost;
-          p.vz *= boost;
+        if (p.role === "background") {
+          // Phase 56: Minimum Vitality Check
+          const speedSq = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz;
+          if (speedSq < 1600) {
+            // min speed ~40
+            const boost = 1.05;
+            p.vx *= boost;
+            p.vy *= boost;
+            p.vz *= boost;
 
-          // Add a tiny random jitter to prevent "dead" straight lines
-          p.vx += (Math.random() - 0.5) * 5;
-          p.vy += (Math.random() - 0.5) * 5;
-          p.vz += (Math.random() - 0.5) * 5;
+            // Add a tiny random jitter to prevent "dead" straight lines
+            p.vx += (Math.random() - 0.5) * 5;
+            p.vy += (Math.random() - 0.5) * 5;
+            p.vz += (Math.random() - 0.5) * 5;
+          }
+        } else {
+          // Constant Brownian noise jitter for shape stars (Phase 56)
+          p.vx += (Math.random() - 0.5) * 2.0;
+          p.vy += (Math.random() - 0.5) * 2.0;
+          p.vz += (Math.random() - 0.5) * 2.0;
         }
-      } else {
-        // Constant Brownian noise jitter for shape stars (Phase 56)
-        p.vx += (Math.random() - 0.5) * 2.0;
-        p.vy += (Math.random() - 0.5) * 2.0;
-        p.vz += (Math.random() - 0.5) * 2.0;
       }
       // No friction for "shape" particles means they will continue at high speed forever until recycled/reused
 
@@ -273,27 +275,39 @@ export class ParticleSystem {
       );
     }
       */
-      // ROLE BASED BEHAVIOR (Background Looping / Recycling)
-      if (p.role === "background") {
-        const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-        const limit = 2500;
+      // ROLE BASED BEHAVIOR (Global Looping / Recycling - Phase 64)
+      const distSq = p.x * p.x + p.y * p.y + p.z * p.z;
+      const limitSq = 4000 * 4000; // Phase 64: Expanded to 4000
 
-        // If a star drifts too far, "recycle" it to the edge with inward velocity
-        if (dist > limit) {
-          const theta = Math.random() * Math.PI * 2;
-          const phi = Math.acos(2 * Math.random() - 1);
-          // Respawn at a distance that is visibly "entering" the frame (1800)
-          const spawnDist = 2000;
-          p.x = spawnDist * Math.sin(phi) * Math.cos(theta);
-          p.y = spawnDist * Math.sin(phi) * Math.sin(theta);
-          p.z = spawnDist * Math.cos(phi);
+      if (distSq > limitSq) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const spawnDist = 2500;
+        p.x = spawnDist * Math.sin(phi) * Math.cos(theta);
+        p.y = spawnDist * Math.sin(phi) * Math.sin(theta);
+        p.z = spawnDist * Math.cos(phi);
 
-          // Give it a clear inward push
-          const speed = 80 + Math.random() * 100; // Increased speed for Phase 39
-          p.vx = -(p.x / spawnDist) * speed;
-          p.vy = -(p.y / spawnDist) * speed;
-          p.vz = -(p.z / spawnDist) * speed;
-        }
+        // Phase 64: Centrifugal Recycling (Avoids visual center)
+        // Target the "outer ring" (1500 - 2500 range)
+        const targetRadius = 1500 + Math.random() * 1000;
+        const targetTheta = Math.random() * Math.PI * 2;
+        const targetPhi = Math.acos(2 * Math.random() - 1);
+
+        const targetX =
+          targetRadius * Math.sin(targetPhi) * Math.cos(targetTheta);
+        const targetY =
+          targetRadius * Math.sin(targetPhi) * Math.sin(targetTheta);
+        const targetZ = targetRadius * Math.cos(targetPhi);
+
+        const dx = targetX - p.x;
+        const dy = targetY - p.y;
+        const dz = targetZ - p.z;
+        const dMag = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+
+        const speed = 120 + Math.random() * 150;
+        p.vx = (dx / dMag) * speed;
+        p.vy = (dy / dMag) * speed;
+        p.vz = (dz / dMag) * speed;
       }
 
       // BLENDED RENDERING
@@ -326,7 +340,7 @@ export class ParticleSystem {
       if (p.state === "blooming" || p.state === "forming") {
         scale *= 1.1 * beatScale; // Uniform subtle glow for all interactive shapes
       } else if (p.state === "chaos") {
-        scale *= 3.0; // Keep chaos stars prominent
+        scale *= 1.8; // Phase 64: Reduced (3.0 -> 1.8) for dense star parity
       }
 
       sizeAttr.array[i] = p.baseSize * scale;

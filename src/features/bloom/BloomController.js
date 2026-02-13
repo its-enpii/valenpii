@@ -137,12 +137,12 @@ export class BloomController {
       this.active = true;
       const t1 = e.touches[0];
       const t2 = e.touches[1];
-      this.initialDistance = Math.hypot(
-        t2.clientX - t1.clientX,
-        t2.clientY - t1.clientY,
-      );
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      // Phase 62: Increased Safety Floor (50px) to prevent "Aggressive Bloom"
+      this.initialDistance = Math.max(50, dist);
       this.touchCenter.x = (t1.clientX + t2.clientX) / 2;
       this.touchCenter.y = (t1.clientY + t2.clientY) / 2;
+      this.bloomFactor = 0; // Strict Reset
       this.prepareBloomParticles(this.touchCenter.x, this.touchCenter.y);
     }
   }
@@ -313,7 +313,7 @@ export class BloomController {
       p.bloomMix = 0;
       p.shapeMix = 0;
       p.state = "chaos";
-      const impulse = 180 + Math.random() * 120;
+      const impulse = 250 + Math.random() * 250; // Phase 63: Boosted (180-300 -> 250-500)
       const angle = Math.random() * Math.PI * 2;
       p.vx = Math.cos(angle) * impulse;
       p.vy = Math.sin(angle) * impulse;

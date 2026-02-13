@@ -205,7 +205,7 @@ export class ShakeController {
 
       // 3. Apply high-speed exit blast
       p.state = "chaos";
-      const impulse = 150 + Math.random() * 150;
+      const impulse = 250 + Math.random() * 250; // Phase 63: Boosted (150-300 -> 250-500)
       const angle = Math.random() * Math.PI * 2;
       p.vx = Math.cos(angle) * impulse;
       p.vy = Math.sin(angle) * impulse;
