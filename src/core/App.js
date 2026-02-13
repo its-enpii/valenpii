@@ -32,11 +32,12 @@ export class App {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
+    const isMobile = window.innerWidth < 600;
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.5, // Reduced from 2.0 to avoid blinding "white blobs"
-      0.8, // Radius (Softer, dreamy spread)
-      0.15, // Threshold (Clean background)
+      isMobile ? 1.5 : 1.1, // Softer on Desktop
+      0.8, // Radius
+      isMobile ? 0.15 : 0.4, // Strict threshold for Desktop to prevent screen-burn
     );
     this.composer.addPass(this.bloomPass);
 

@@ -70,7 +70,9 @@ export class ParticleSystem {
         vColor = color;
         vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
         float pSize = size * ( 600.0 / -mvPosition.z ); 
-        gl_PointSize = min(pSize, 80.0); 
+        
+        // Hard cap to prevent white-out on desktop. 45.0 is safe for all.
+        gl_PointSize = min(pSize, 45.0); 
         gl_Position = projectionMatrix * mvPosition;
       }
     `;
@@ -114,6 +116,7 @@ export class ParticleSystem {
 
   createPool(count) {
     this.particles = [];
+    const isMobile = window.innerWidth < 600;
     const shapeLimit = Math.floor(this.maxParticles * 0.7); // 70% Shape, 30% Background
 
     for (let i = 0; i < this.maxParticles; i++) {
@@ -157,7 +160,7 @@ export class ParticleSystem {
         vz: vz,
         role: role,
         state: "chaos",
-        baseSize: Math.random() * 12 + 8,
+        baseSize: isMobile ? Math.random() * 12 + 8 : Math.random() * 8 + 4, // Half size on Desktop
         twinkleSpeed: Math.random() * 0.05 + 0.01,
         twinkleOffset: Math.random() * Math.PI * 2,
         bloomX: 0,
