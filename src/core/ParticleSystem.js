@@ -16,6 +16,8 @@ export class ParticleSystem {
 
     // Phase 65: Interaction Pulses (Shockwaves)
     this.pulses = [];
+    this.lastMX = -9999;
+    this.lastMY = -9999;
   }
 
   async init() {
@@ -221,9 +223,9 @@ export class ParticleSystem {
         const diff = Math.abs(dist - currentRadius);
 
         if (diff < thickness) {
-          // Push force increases with life and proximity to shell edge
-          const force =
-            (1 - diff / thickness) * pulse.strength * pulse.life * dt;
+          // Phase 70: Soft Shell falloff (prevents "solid wall" feel)
+          const shellFalloff = 1.0 - diff / thickness;
+          const force = shellFalloff * pulse.strength * pulse.life * dt;
           const mag = dist || 1;
 
           // Apply push in world space, adjusted for perspective to look consistent
@@ -311,9 +313,9 @@ export class ParticleSystem {
         p.y = spawnDist * Math.sin(phi) * Math.sin(theta);
         p.z = spawnDist * Math.cos(phi);
 
-        // Phase 64: Centrifugal Recycling (Avoids visual center)
-        // Target the "outer ring" (1500 - 2500 range)
-        const targetRadius = 1500 + Math.random() * 1000;
+        // Phase 70: Relaxed Recycling (Allows stars to refill the center)
+        // Target a wider range (0 - 2500) instead of just the ring
+        const targetRadius = Math.random() * 2500;
         const targetTheta = Math.random() * Math.PI * 2;
         const targetPhi = Math.acos(2 * Math.random() - 1);
 
@@ -379,9 +381,13 @@ export class ParticleSystem {
 
     // Auto-Pulse for Desktop Hover (Transient Magic Trail)
     if (mX > -9000) {
-      // Trigger a small pulse every 2nd frame or so to keep it fluid but light
-      if (Math.random() > 0.7) {
-        this.addPulse(mX, mY, 80, 150);
+      // Phase 70: Movement-based Pulsing
+      // Only spawn a pulse if the mouse has moved significantly (threshold 10 units)
+      const moveDist = Math.hypot(mX - this.lastMX, mY - this.lastMY);
+      if (moveDist > 10) {
+        this.addPulse(mX, mY, 100, 180); // Slightly stronger but only on move
+        this.lastMX = mX;
+        this.lastMY = mY;
       }
     }
   }
