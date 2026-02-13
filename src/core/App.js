@@ -85,6 +85,35 @@ export class App {
       },
       { passive: true },
     );
+    // Interaction Branching: Phase 69
+    const isMobile = window.innerWidth < 600;
+
+    const triggerPulse = (e) => {
+      const x = e.clientX || (e.touches && e.touches[0].clientX);
+      const y = e.clientY || (e.touches && e.touches[0].clientY);
+      if (x !== undefined && y !== undefined) {
+        const worldX = (x / window.innerWidth) * 2 - 1;
+        const worldY = -(y / window.innerHeight) * 2 + 1;
+        this.particleSystem.addPulse(worldX * 450, worldY * 460, 600, 400);
+      }
+    };
+
+    if (isMobile) {
+      // MOBILE: Taps trigger Pulse (Shake handled by sensors)
+      window.addEventListener(
+        "touchstart",
+        (e) => {
+          if (e.touches.length === 1) triggerPulse(e);
+        },
+        { passive: true },
+      );
+    } else {
+      // DESKTOP: Clicks trigger Shape Change (Shake Simulation)
+      window.addEventListener("mousedown", () => {
+        this.shakeController.handleShake(20);
+      });
+      // Desktop Hover Pulse is already handled in ParticleSystem.update()
+    }
   }
 
   render() {

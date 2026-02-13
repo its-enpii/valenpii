@@ -13,6 +13,9 @@ export class ParticleSystem {
     this.positions = new Float32Array(this.maxParticles * 3);
     this.colors = new Float32Array(this.maxParticles * 3);
     this.sizes = new Float32Array(this.maxParticles);
+
+    // Phase 65: Interaction Pulses (Shockwaves)
+    this.pulses = [];
   }
 
   async init() {
@@ -189,27 +192,48 @@ export class ParticleSystem {
     const sizeAttr = this.geometry.attributes.size;
     const time = Date.now() * 0.002;
 
-    // Convert mouse to world units (approx)
-    const mX = mouse ? mouse.x * 400 : -9999;
-    const mY = mouse ? mouse.y * 300 : -9999;
+    // Phase 67: Corrected mapping for full-corner coverage
+    const mX = mouse ? mouse.x * 450 : -9999;
+    const mY = mouse ? mouse.y * 460 : -9999;
 
     for (let i = 0; i < this.maxParticles; i++) {
       const p = this.particles[i];
 
-      // PUSH/PULL INTERACTION (Phase 42)
-      if (mX > -9000) {
-        const dx = p.x - mX;
-        const dy = p.y - mY;
-        const distSq = dx * dx + dy * dy;
-        const repulsionRadius = 40000; // Increased radius (~200 units)
+      // Phase 65/68: Shockwave Pulse Processing (Perspective Aware)
+      this.pulses.forEach((pulse) => {
+        // Project particle world position to its apparent screen position at Z=0
+        // Camera is at Z=600. Factor = 600 / (600 - p.z)
+        const perspectiveFactor = 600 / Math.max(1, 600 - p.z);
+        const apparentX = p.x * perspectiveFactor;
+        const apparentY = p.y * perspectiveFactor;
 
-        if (distSq < repulsionRadius) {
-          const force = (1 - distSq / repulsionRadius) * 350 * dt;
-          const mag = Math.sqrt(distSq) || 1;
-          p.vx += (dx / mag) * force;
-          p.vy += (dy / mag) * force;
+        const dx = apparentX - pulse.x;
+        const dy = apparentY - pulse.y;
+        const distSq = dx * dx + dy * dy;
+
+        // Shockwave shell (Expanding ring)
+        const age = 1.0 - pulse.life; // 0 -> 1
+        const currentRadius = pulse.maxRadius * age;
+        const dist = Math.sqrt(distSq);
+
+        // Define a shell thickness (e.g., 60 units)
+        const thickness = 70; // Slightly increased for Phase 68
+        const diff = Math.abs(dist - currentRadius);
+
+        if (diff < thickness) {
+          // Push force increases with life and proximity to shell edge
+          const force =
+            (1 - diff / thickness) * pulse.strength * pulse.life * dt;
+          const mag = dist || 1;
+
+          // Apply push in world space, adjusted for perspective to look consistent
+          p.vx += (dx / mag) * force * (1 / perspectiveFactor);
+          p.vy += (dy / mag) * force * (1 / perspectiveFactor);
+
+          // Phase 68: Add a tiny Z-kick to make it feel 3D
+          p.vz += (Math.random() - 0.5) * force * 0.5;
         }
-      }
+      });
 
       // BASE PHYSICS (The "Chaos" drift)
       if (p.state === "chaos") {
@@ -348,5 +372,30 @@ export class ParticleSystem {
 
     posAttr.needsUpdate = true;
     sizeAttr.needsUpdate = true;
+
+    // Update and prune pulses
+    this.pulses.forEach((p) => (p.life -= dt * 1.5)); // Fast decay
+    this.pulses = this.pulses.filter((p) => p.life > 0);
+
+    // Auto-Pulse for Desktop Hover (Transient Magic Trail)
+    if (mX > -9000) {
+      // Trigger a small pulse every 2nd frame or so to keep it fluid but light
+      if (Math.random() > 0.7) {
+        this.addPulse(mX, mY, 80, 150);
+      }
+    }
+  }
+
+  addPulse(x, y, strength = 400, radius = 300) {
+    this.pulses.push({
+      x,
+      y,
+      strength,
+      maxRadius: radius,
+      life: 1.0,
+    });
+
+    // Limit active pulses for performance
+    if (this.pulses.length > 10) this.pulses.shift();
   }
 }

@@ -33,12 +33,6 @@ export class ShakeController {
     this.particleSystem.createPool(this.particleSystem.maxParticles);
     this.setChaosMode(true);
     this.setupPermissions();
-    // FALLBACK: Single click/tap to switch shapes if shake is unavailable
-    window.addEventListener("click", () => {
-      if (!this.isShaking) {
-        this.handleShake(20); // Force a shake trigger
-      }
-    });
 
     // Safety delay
     setTimeout(() => {
