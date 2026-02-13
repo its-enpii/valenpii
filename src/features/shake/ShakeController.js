@@ -1,0 +1,248 @@
+import * as THREE from "three";
+import gsap from "gsap";
+import { ShapeGenerator } from "./ShapeGenerator.js";
+
+export class ShakeController {
+  constructor(particleSystem) {
+    this.particleSystem = particleSystem;
+    this.shapeGenerator = new ShapeGenerator();
+
+    this.shapes = ["Love", "HEART_SHAPE", "Be Mine"];
+    this.currentShapeIndex = 0;
+    this.shakeThreshold = 8; // Lowered from 15 for better mobile sensitivity
+    this.sustainTimeout = 1500; // 1.5s delay after stopping shake as requested
+    this.isReady = false; // Guard against initial sensor noise
+
+    this.colors = [
+      new THREE.Color(0xff1493),
+      new THREE.Color(0xff69b4),
+      new THREE.Color(0xffb6c1),
+      new THREE.Color(0xdc143c),
+      new THREE.Color(0xffffff),
+      new THREE.Color(0xff0000),
+    ];
+
+    this.isShaking = false;
+    this.lastShakeTime = 0;
+    this.onDeviceMotion = this.onDeviceMotion.bind(this);
+    this.checkMotionPermission = this.checkMotionPermission.bind(this);
+  }
+
+  async init() {
+    await this.shapeGenerator.load();
+    this.particleSystem.createPool(this.particleSystem.maxParticles);
+    this.setChaosMode(true);
+    this.setupPermissions();
+    // FALLBACK: Single click/tap to switch shapes if shake is unavailable
+    window.addEventListener("click", () => {
+      if (!this.isShaking) {
+        this.handleShake(20); // Force a shake trigger
+      }
+    });
+
+    // Safety delay
+    setTimeout(() => {
+      this.isReady = true;
+    }, 2000);
+  }
+
+  setupPermissions() {
+    const btn = document.getElementById("permission-btn");
+    if (btn) {
+      if (
+        typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function"
+      ) {
+        btn.classList.remove("hidden");
+        btn.addEventListener("click", this.checkMotionPermission);
+      } else {
+        window.addEventListener("devicemotion", this.onDeviceMotion);
+      }
+    }
+  }
+
+  checkMotionPermission() {
+    DeviceMotionEvent.requestPermission()
+      .then((state) => {
+        if (state === "granted") {
+          window.addEventListener("devicemotion", this.onDeviceMotion);
+          document.getElementById("permission-btn").classList.add("hidden");
+        }
+      })
+      .catch(console.error);
+  }
+
+  triggerShakeSimulation() {
+    this.handleShake(20);
+    let pulses = 0;
+    const interval = setInterval(() => {
+      this.handleShake(20);
+      pulses++;
+      if (pulses > 10) clearInterval(interval);
+    }, 100);
+  }
+
+  onDeviceMotion(e) {
+    let mag = 0;
+    if (e.acceleration && e.acceleration.x !== null) {
+      const acc = e.acceleration;
+      mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+    } else if (e.accelerationIncludingGravity) {
+      const acc = e.accelerationIncludingGravity;
+      const rawMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      mag = Math.abs(rawMag - 9.8);
+    }
+    this.handleShake(mag);
+  }
+
+  handleShake(magnitude) {
+    if (!this.isReady) return;
+
+    if (magnitude > this.shakeThreshold) {
+      this.lastShakeTime = Date.now();
+      if (!this.isShaking) {
+        this.startShaking();
+      }
+    }
+  }
+
+  startShaking() {
+    this.isShaking = true;
+    const shapeName = this.shapes[this.currentShapeIndex];
+    let points = [];
+
+    // RESPONSIVE SCALING
+    const isMobile = window.innerWidth < 600;
+    const heartScale = isMobile ? 150 : 300; // Lowered from 220
+    const baseFontSize = isMobile ? 100 : 220; // Lowered from 120
+
+    if (shapeName === "HEART_SHAPE") {
+      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 4000); // Reduced from 6k to 4k for mobile performance
+    } else {
+      const fontSize = shapeName.length > 5 ? baseFontSize * 0.8 : baseFontSize;
+      points = this.shapeGenerator.generateTextPoints(
+        shapeName,
+        0,
+        0,
+        fontSize,
+        5000, // Reduced from 8k to 5k for better 60fps stability
+      );
+    }
+
+    const particles = this.particleSystem.particles;
+    particles.forEach((p, i) => {
+      if (i < points.length) {
+        p.state = "forming";
+        gsap.killTweensOf(p);
+        gsap.to(p, {
+          x: points[i].x,
+          y: -points[i].y,
+          z: points[i].z || 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          duration: 1.0 + Math.random() * 0.5,
+          ease: "power3.out",
+        });
+      } else if (p.state !== "chaos" && p.state !== "blooming") {
+        p.state = "chaos";
+      }
+    });
+  }
+
+  stopShaking() {
+    this.isShaking = false;
+    this.currentShapeIndex = (this.currentShapeIndex + 1) % this.shapes.length;
+    this.setChaosMode();
+  }
+
+  setChaosMode(initial = false) {
+    const particles = this.particleSystem.particles;
+    const colorAttr = this.particleSystem.geometry.attributes.color;
+
+    particles.forEach((p, i) => {
+      if (p.state === "blooming") return; // Don't interrupt bloom
+
+      p.state = "chaos";
+      const radius = 600 + Math.random() * 1200;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+
+      const tx = radius * Math.sin(phi) * Math.cos(theta);
+      const ty = radius * Math.sin(phi) * Math.sin(theta);
+      const tz = radius * Math.cos(phi);
+
+      if (initial) {
+        p.x = tx;
+        p.y = ty;
+        p.z = tz;
+        const color =
+          this.colors[Math.floor(Math.random() * this.colors.length)];
+        colorAttr.array[i * 3] = color.r;
+        colorAttr.array[i * 3 + 1] = color.g;
+        colorAttr.array[i * 3 + 2] = color.b;
+      } else {
+        // OPTIMIZED: High-speed explosion back to chaos
+        gsap.killTweensOf(p);
+        const impulse = 120 + Math.random() * 80; // Doubled speed (60-120 -> 120-200)
+        const angle = Math.random() * Math.PI * 2;
+        p.vx = Math.cos(angle) * impulse;
+        p.vy = Math.sin(angle) * impulse;
+        p.vz = (Math.random() - 0.5) * impulse;
+      }
+    });
+    colorAttr.needsUpdate = true;
+  }
+
+  update(dt) {
+    if (
+      this.isShaking &&
+      Date.now() - this.lastShakeTime > this.sustainTimeout
+    ) {
+      this.stopShaking();
+    }
+
+    const particles = this.particleSystem.particles;
+    for (const p of particles) {
+      if (p.state === "forming") {
+        // Heartbeat Logic for Shake
+        const time = Date.now() * 0.002;
+        const beat = Math.pow(Math.sin(time * 3.0), 60);
+        const beatTranslate = beat * 1.5; // Slight push outward
+
+        // We can't easily scale the whole shape here without storing the target original position.
+        // So we add a small jitter/push that simulates energy.
+        // OR better: we don't do full shape scaling here because it's complex to reconstruct the center.
+        // Let's just add a "breath" effect to the noise.
+
+        p.x += (Math.random() - 0.5) * (1.5 + beatTranslate);
+        p.y += (Math.random() - 0.5) * (1.5 + beatTranslate);
+        p.z += (Math.random() - 0.5) * (2 + beatTranslate);
+      } else if (p.state === "chaos") {
+        // GALAXY DRIFT (Chaos State Only)
+
+        // 1. Gentle Rotation around Y axis
+        const speed = 0.05 * dt;
+        const cos = Math.cos(speed);
+        const sin = Math.sin(speed);
+
+        const nx = p.x * cos - p.z * sin;
+        const nz = p.x * sin + p.z * cos;
+        p.x = nx;
+        p.z = nz;
+
+        // 2. Ambient Float
+        p.x += Math.sin(Date.now() * 0.001 + p.y * 0.01) * 0.2;
+        p.y += Math.cos(Date.now() * 0.001 + p.x * 0.01) * 0.2;
+
+        // 3. Soft Boundary Pull
+        const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+        if (dist > 2500) {
+          p.x *= 0.995;
+          p.y *= 0.995;
+          p.z *= 0.995;
+        }
+      }
+    }
+  }
+}

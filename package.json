@@ -1,0 +1,32 @@
+{
+  "name": "valentine-particle-magic",
+  "version": "1.0.0",
+  "description": "Interactive Valentine's Day experience with particle effects - Shake for Love & Pinch to Bloom",
+  "main": "public/index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "valentine",
+    "particles",
+    "interactive",
+    "webgl",
+    "mobile"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@pixi/filter-glow": "^5.2.1",
+    "@pixi/particle-emitter": "^5.0.8",
+    "gsap": "^3.12.5",
+    "howler": "^2.2.4",
+    "opentype.js": "^1.3.4",
+    "pixi.js": "^7.3.2",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.12"
+  }
+}
