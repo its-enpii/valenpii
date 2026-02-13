@@ -175,7 +175,17 @@ export class BloomController {
       p.state = "blooming";
       gsap.killTweensOf(p);
       p.vx = p.vy = p.vz = 0; // Stop drift briefly for cleaner form
+
+      // Phase 57: Immediate initialization to current position
+      // Prevents collapse to (0,0,0) if gesture ends instantly
+      p.bloomX = p.x;
+      p.bloomY = p.y;
+      p.bloomZ = p.z;
+      p.bloomMix = 0;
     });
+
+    // Push initial targets immediately
+    this.updateBloom();
   }
 
   onTouchMove(e) {
@@ -282,15 +292,20 @@ export class BloomController {
 
     // SEAMLESS EXPLOSION: No more tweening bloomMix to 0
     this.bloomParticles.forEach((p) => {
-      // 1. Capture current visual position (Center + Offset)
-      p.x = p.bloomX;
-      p.y = p.bloomY;
-      p.z = p.bloomZ;
+      // Phase 58: Resolve full visual hierarchy (Base Shape -> Bloom)
+      // This prevents the "flash" of a heart if released during a pinch-in.
+      const baseX = p.x * (1 - p.shapeMix) + p.shapeX * p.shapeMix;
+      const baseY = p.y * (1 - p.shapeMix) + p.shapeY * p.shapeMix;
+      const baseZ = p.z * (1 - p.shapeMix) + p.shapeZ * p.shapeMix;
 
-      // 2. Kill shape influence
+      const mix = p.bloomMix;
+      p.x = baseX * (1 - mix) + p.bloomX * mix;
+      p.y = baseY * (1 - mix) + p.bloomY * mix;
+      p.z = baseZ * (1 - mix) + p.bloomZ * mix;
+
+      // 2. Kill ALL shape influences (Bloom and Text)
       p.bloomMix = 0;
-
-      // 3. High-speed exit blast
+      p.shapeMix = 0;
       p.state = "chaos";
       const impulse = 180 + Math.random() * 120;
       const angle = Math.random() * Math.PI * 2;

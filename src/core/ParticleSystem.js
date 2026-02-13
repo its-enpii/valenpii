@@ -138,13 +138,13 @@ export class ParticleSystem {
         ry = radius * Math.sin(phi) * Math.sin(theta);
         rz = radius * Math.cos(phi);
 
-        // Initial inward drift - Brisk movement
-        const speed = 30 + Math.random() * 40;
+        // Initial inward drift - Brisk movement (Phase 56)
+        const speed = 120 + Math.random() * 100;
         vx = -(rx / radius) * speed;
         vy = -(ry / radius) * speed;
         vz = -(rz / radius) * speed;
       } else {
-        // Shape stars start in chaos with a tiny random drift
+        // Shape stars start in chaos with a vibrant random drift
         const radius = 1000 + Math.random() * 1000;
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
@@ -152,9 +152,11 @@ export class ParticleSystem {
         ry = radius * Math.sin(phi) * Math.sin(theta);
         rz = radius * Math.cos(phi);
 
-        vx = (Math.random() - 0.5) * 20;
-        vy = (Math.random() - 0.5) * 20;
-        vz = (Math.random() - 0.5) * 20;
+        const impulse = 120 + Math.random() * 80;
+        const angle = Math.random() * Math.PI * 2;
+        vx = Math.cos(angle) * impulse;
+        vy = Math.sin(angle) * impulse;
+        vz = (Math.random() - 0.5) * impulse;
       }
 
       this.particles.push({
@@ -194,29 +196,47 @@ export class ParticleSystem {
     for (let i = 0; i < this.maxParticles; i++) {
       const p = this.particles[i];
 
-      // MAGIC TRAIL - Slight interactive push
+      // PUSH/PULL INTERACTION (Phase 42)
       if (mX > -9000) {
         const dx = p.x - mX;
         const dy = p.y - mY;
         const distSq = dx * dx + dy * dy;
-        if (distSq < 15000) {
-          // Optimized: avoid Math.sqrt for high-frequency physics
-          const force = (1 - distSq / 15000) * 80 * dt;
-          p.vx += dx * force * 0.1;
-          p.vy += dy * force * 0.1;
+        const repulsionRadius = 40000; // Increased radius (~200 units)
+
+        if (distSq < repulsionRadius) {
+          const force = (1 - distSq / repulsionRadius) * 350 * dt;
+          const mag = Math.sqrt(distSq) || 1;
+          p.vx += (dx / mag) * force;
+          p.vy += (dy / mag) * force;
         }
       }
 
       // BASE PHYSICS (The "Chaos" drift)
       if (p.role === "background") {
-        const friction = 0.985; // Only dampen background stars
+        const friction = 0.985;
         p.vx *= friction;
         p.vy *= friction;
         p.vz *= friction;
+
+        // Phase 56: Minimum Vitality Check
+        const speedSq = p.vx * p.vx + p.vy * p.vy + p.vz * p.vz;
+        if (speedSq < 1600) {
+          // min speed ~40
+          const boost = 1.05;
+          p.vx *= boost;
+          p.vy *= boost;
+          p.vz *= boost;
+
+          // Add a tiny random jitter to prevent "dead" straight lines
+          p.vx += (Math.random() - 0.5) * 5;
+          p.vy += (Math.random() - 0.5) * 5;
+          p.vz += (Math.random() - 0.5) * 5;
+        }
       } else {
-        // Tiny ambient noise for shape particles to prevent them from being "dead" still
-        p.vx += (Math.random() - 0.5) * 0.1;
-        p.vy += (Math.random() - 0.5) * 0.1;
+        // Constant Brownian noise jitter for shape stars (Phase 56)
+        p.vx += (Math.random() - 0.5) * 2.0;
+        p.vy += (Math.random() - 0.5) * 2.0;
+        p.vz += (Math.random() - 0.5) * 2.0;
       }
       // No friction for "shape" particles means they will continue at high speed forever until recycled/reused
 
@@ -226,7 +246,7 @@ export class ParticleSystem {
 
       // ATOMOSPHERIC DRIFT (Gentle Rotation)
       if (p.role === "background") {
-        const rotSpeed = 0.06 * dt; // Increased for more dynamic feel
+        const rotSpeed = 0.15 * dt; // Increased for Phase 39 (0.06 -> 0.15)
         const cos = Math.cos(rotSpeed);
         const sin = Math.sin(rotSpeed);
         const nx = p.x * cos - p.z * sin;
@@ -269,7 +289,7 @@ export class ParticleSystem {
           p.z = spawnDist * Math.cos(phi);
 
           // Give it a clear inward push
-          const speed = 40 + Math.random() * 50;
+          const speed = 80 + Math.random() * 100; // Increased speed for Phase 39
           p.vx = -(p.x / spawnDist) * speed;
           p.vy = -(p.y / spawnDist) * speed;
           p.vz = -(p.z / spawnDist) * speed;
