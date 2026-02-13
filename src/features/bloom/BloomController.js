@@ -203,7 +203,7 @@ export class BloomController {
 
       this.bloomFactor = Math.min(
         1.0,
-        Math.max(0, (currentDistance / this.initialDistance - 1) * 0.8), // Reduced to 0.8 for smooth bloom
+        Math.max(0, (currentDistance / this.initialDistance - 1) * 0.4), // Phase 60: Softened (0.8 -> 0.4)
       );
       this.updateBloom();
     }
@@ -256,7 +256,10 @@ export class BloomController {
       p.bloomX = this.center3D.x + target.x;
       p.bloomY = this.center3D.y - target.y;
       p.bloomZ = target.z || 0;
-      p.bloomMix = f; // This controls the density directly
+
+      // Phase 59: Cubic smoothing to prevent "white clump" at low factors
+      // f^3 ensures the heart starts small/invisible and expands quickly
+      p.bloomMix = Math.pow(f, 3);
     });
 
     // CELEBRATION BURST (One-time pop when full)
@@ -287,8 +290,11 @@ export class BloomController {
   onTouchEnd() {
     this.active = false;
     this.bloomFactor = 0;
-    this.isLocked = false; // Reset lock
+    this.isLocked = false;
     this.updateUI();
+
+    // Phase 59: Hard kill all celebration tweens to prevent "re-forming" heart flash
+    gsap.killTweensOf(this.bloomParticles);
 
     // SEAMLESS EXPLOSION: No more tweening bloomMix to 0
     this.bloomParticles.forEach((p) => {
