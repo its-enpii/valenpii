@@ -16,9 +16,9 @@ export class BloomController {
 
     // Use a subset of particles
     const isMobile = window.innerWidth < 600;
-    const totalShapes = Math.floor(this.particleSystem.maxParticles * 0.7);
-    this.poolStart = isMobile ? 3000 : 5000;
-    this.poolEnd = isMobile ? 6000 : 12000;
+    const totalShapes = Math.floor(this.particleSystem.maxParticles * 0.75);
+    this.poolStart = isMobile ? 3000 : 6000;
+    this.poolEnd = isMobile ? 6000 : 9000; // Tighter pool for a thinner look
 
     // Simulation for Desktop
     this.isMouseDown = false;
@@ -37,7 +37,7 @@ export class BloomController {
       0,
       0,
       heartScale,
-      2000,
+      2800, // Reduced density for a thinner, more elegant heart
     );
 
     // Mobile Listeners
@@ -263,39 +263,31 @@ export class BloomController {
   }
 
   onTouchEnd() {
-    if (this.active) {
-      this.active = false;
-      this.bloomFactor = 0; // Explicitly reset factor
-      this.isLocked = false; // Reset lock
+    this.active = false;
+    this.bloomFactor = 0;
+    this.isLocked = false; // Reset lock
+    this.updateUI();
 
-      // Smoothly fade the mix to zero
-      gsap.to(this.bloomParticles, {
-        bloomMix: 0,
-        duration: 0.8,
-        stagger: 0.0001,
-        ease: "power2.inOut",
-        onComplete: () => {
-          this.bloomParticles.forEach((p) => {
-            // SYNC POSITION BEFORE EXPLOSIVE EXIT
-            // Use the current bloomX (which is the center-offset heart) as starting physical point
-            p.x = p.bloomX;
-            p.y = p.bloomY;
-            p.z = p.bloomZ;
-            p.bloomMix = 0; // Hand over control back to physics/chaos
+    // SEAMLESS EXPLOSION: No more tweening bloomMix to 0
+    this.bloomParticles.forEach((p) => {
+      // 1. Capture current visual position (Center + Offset)
+      p.x = p.bloomX;
+      p.y = p.bloomY;
+      p.z = p.bloomZ;
 
-            p.state = "chaos";
-            const impulse = 180 + Math.random() * 120;
-            const angle = Math.random() * Math.PI * 2;
-            p.vx = Math.cos(angle) * impulse;
-            p.vy = Math.sin(angle) * impulse;
-            p.vz = (Math.random() - 0.5) * impulse;
-          });
-        },
-      });
+      // 2. Kill shape influence
+      p.bloomMix = 0;
 
-      // UI Reset is handled by updateUI due to bloomFactor = 0
-      this.updateUI();
-    }
+      // 3. High-speed exit blast
+      p.state = "chaos";
+      const impulse = 180 + Math.random() * 120;
+      const angle = Math.random() * Math.PI * 2;
+      p.vx = Math.cos(angle) * impulse;
+      p.vy = Math.sin(angle) * impulse;
+      p.vz = (Math.random() - 0.5) * impulse;
+    });
+
+    this.bloomParticles = []; // Clear the array as particles are now in chaos
   }
 
   update(dt) {

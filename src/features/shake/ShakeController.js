@@ -137,7 +137,7 @@ export class ShakeController {
     const baseFontSize = isMobile ? 100 : 220; // Lowered from 120
 
     if (shapeName === "HEART_SHAPE") {
-      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 8000);
+      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 6000);
     } else {
       const fontSize = shapeName.length > 5 ? baseFontSize * 0.8 : baseFontSize;
       points = this.shapeGenerator.generateTextPoints(
@@ -145,7 +145,7 @@ export class ShakeController {
         0,
         0,
         fontSize,
-        10000,
+        7500,
       );
     }
 
