@@ -16,8 +16,9 @@ export class BloomController {
 
     // Use a subset of particles
     const isMobile = window.innerWidth < 600;
-    this.poolStart = isMobile ? 3000 : 10000;
-    this.poolEnd = isMobile ? 5000 : 12000;
+    const totalShapes = Math.floor(this.particleSystem.maxParticles * 0.7);
+    this.poolStart = isMobile ? 3000 : 5000;
+    this.poolEnd = isMobile ? 6000 : 12000;
 
     // Simulation for Desktop
     this.isMouseDown = false;
@@ -275,10 +276,19 @@ export class BloomController {
         ease: "power2.inOut",
         onComplete: () => {
           this.bloomParticles.forEach((p) => {
+            // SYNC POSITION BEFORE EXPLOSIVE EXIT
+            // Use the current bloomX (which is the center-offset heart) as starting physical point
+            p.x = p.bloomX;
+            p.y = p.bloomY;
+            p.z = p.bloomZ;
+            p.bloomMix = 0; // Hand over control back to physics/chaos
+
             p.state = "chaos";
-            p.vx = (Math.random() - 0.5) * 40;
-            p.vy = (Math.random() - 0.5) * 40;
-            p.vz = (Math.random() - 0.5) * 40;
+            const impulse = 180 + Math.random() * 120;
+            const angle = Math.random() * Math.PI * 2;
+            p.vx = Math.cos(angle) * impulse;
+            p.vy = Math.sin(angle) * impulse;
+            p.vz = (Math.random() - 0.5) * impulse;
           });
         },
       });

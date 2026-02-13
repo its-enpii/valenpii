@@ -137,7 +137,7 @@ export class ShakeController {
     const baseFontSize = isMobile ? 100 : 220; // Lowered from 120
 
     if (shapeName === "HEART_SHAPE") {
-      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 4000); // Reduced from 6k to 4k for mobile performance
+      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 8000);
     } else {
       const fontSize = shapeName.length > 5 ? baseFontSize * 0.8 : baseFontSize;
       points = this.shapeGenerator.generateTextPoints(
@@ -145,34 +145,74 @@ export class ShakeController {
         0,
         0,
         fontSize,
-        5000, // Reduced from 8k to 5k for better 60fps stability
+        10000,
       );
     }
 
     const particles = this.particleSystem.particles;
+    const targets = [];
+
     particles.forEach((p, i) => {
+      if (p.role !== "shape") return;
+
       if (i < points.length) {
         p.state = "forming";
-        gsap.killTweensOf(p);
-        gsap.to(p, {
-          x: points[i].x,
-          y: -points[i].y,
-          z: points[i].z || 0,
-          vx: 0,
-          vy: 0,
-          vz: 0,
-          duration: 1.0 + Math.random() * 0.5,
-          ease: "power3.out",
-        });
+        p.shapeX = points[i].x;
+        p.shapeY = -points[i].y;
+        p.shapeZ = points[i].z || 0;
+        p.vx = 0;
+        p.vy = 0;
+        p.vz = 0;
+        targets.push(p);
       } else if (p.state !== "chaos" && p.state !== "blooming") {
         p.state = "chaos";
+        p.shapeMix = 0; // Ensure they don't try to form
       }
+    });
+
+    // BATCH ANIMATION: Use a proxy to animate shapeMix for all targets
+    const proxy = { value: 0 };
+    gsap.killTweensOf(targets); // Kill any existing individual tweens just in case
+    gsap.to(proxy, {
+      value: 1,
+      duration: 1.0,
+      ease: "power3.out",
+      onUpdate: () => {
+        targets.forEach((p) => {
+          if (p.state === "forming") p.shapeMix = proxy.value;
+        });
+      },
     });
   }
 
   stopShaking() {
     this.isShaking = false;
     this.currentShapeIndex = (this.currentShapeIndex + 1) % this.shapes.length;
+
+    // INSTANT SEAMLESS EXPLOSION
+    const shapeParticles = this.particleSystem.particles.filter(
+      (p) => p.state === "forming",
+    );
+
+    shapeParticles.forEach((p) => {
+      // 1. Capture current visual position into the physical 'x'
+      p.x = p.shapeX;
+      p.y = p.shapeY;
+      p.z = p.shapeZ;
+
+      // 2. Kill the influence of the shape formation
+      p.shapeMix = 0;
+
+      // 3. Apply high-speed exit blast
+      p.state = "chaos";
+      const impulse = 150 + Math.random() * 150;
+      const angle = Math.random() * Math.PI * 2;
+      p.vx = Math.cos(angle) * impulse;
+      p.vy = Math.sin(angle) * impulse;
+      p.vz = (Math.random() - 0.5) * impulse;
+    });
+
+    // Cleanup background stars (optional, ensures they return nicely)
     this.setChaosMode();
   }
 
@@ -239,23 +279,7 @@ export class ShakeController {
         p.y += (Math.random() - 0.5) * (1.5 + beatTranslate);
         p.z += (Math.random() - 0.5) * (2 + beatTranslate);
       } else if (p.state === "chaos") {
-        // GALAXY DRIFT (Chaos State Only)
-
-        // 1. Gentle Rotation around Y axis
-        const speed = 0.05 * dt;
-        const cos = Math.cos(speed);
-        const sin = Math.sin(speed);
-
-        const nx = p.x * cos - p.z * sin;
-        const nz = p.x * sin + p.z * cos;
-        p.x = nx;
-        p.z = nz;
-
-        // 2. Ambient Float
-        p.x += Math.sin(Date.now() * 0.001 + p.y * 0.01) * 0.2;
-        p.y += Math.cos(Date.now() * 0.001 + p.x * 0.01) * 0.2;
-
-        // Boundaries removed to allow particles to escape and keep display clean
+        // GALAXY DRIFT handled by ParticleSystem for all background stars
       }
     }
   }

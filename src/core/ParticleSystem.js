@@ -4,7 +4,7 @@ export class ParticleSystem {
   constructor(scene) {
     this.scene = scene;
     const isMobile = window.innerWidth < 600;
-    this.maxParticles = isMobile ? 6000 : 16000; // Lowered from 8k for 60fps on mobile
+    this.maxParticles = isMobile ? 12000 : 25000; // Increased for more background stars
 
     this.particles = [];
     this.geometry = new THREE.BufferGeometry();
@@ -114,23 +114,61 @@ export class ParticleSystem {
 
   createPool(count) {
     this.particles = [];
+    const shapeLimit = Math.floor(this.maxParticles * 0.7); // 70% Shape, 30% Background
+
     for (let i = 0; i < this.maxParticles; i++) {
+      const role = i < shapeLimit ? "shape" : "background";
+
+      // Initial positions for background stars (Atmosphere)
+      let rx = 0,
+        ry = 0,
+        rz = 0;
+      let vx = 0,
+        vy = 0,
+        vz = 0;
+
+      if (role === "background") {
+        const radius = 600 + Math.random() * 1200; // Closer range for better density
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        rx = radius * Math.sin(phi) * Math.cos(theta);
+        ry = radius * Math.sin(phi) * Math.sin(theta);
+        rz = radius * Math.cos(phi);
+
+        // Initial inward drift - Brisk movement
+        const speed = 30 + Math.random() * 40;
+        vx = -(rx / radius) * speed;
+        vy = -(ry / radius) * speed;
+        vz = -(rz / radius) * speed;
+      } else {
+        // Shape stars start far away (hidden)
+        const angle = Math.random() * Math.PI * 2;
+        rx = Math.cos(angle) * 3000;
+        ry = Math.sin(angle) * 3000;
+        rz = (Math.random() - 0.5) * 1000;
+      }
+
       this.particles.push({
-        x: 0,
-        y: 0,
-        z: 0,
-        vx: 0,
-        vy: 0,
-        vz: 0,
+        x: rx,
+        y: ry,
+        z: rz,
+        vx: vx,
+        vy: vy,
+        vz: vz,
+        role: role,
         state: "chaos",
-        baseSize: Math.random() * 12 + 8, // Balanced size: noticeable but not massive
-        twinkleSpeed: Math.random() * 0.05 + 0.02,
+        baseSize: Math.random() * 12 + 8,
+        twinkleSpeed: Math.random() * 0.05 + 0.01,
         twinkleOffset: Math.random() * Math.PI * 2,
-        // Bloom Blending
         bloomX: 0,
         bloomY: 0,
         bloomZ: 0,
         bloomMix: 0,
+        // Shape Formation Blending
+        shapeX: rx,
+        shapeY: ry,
+        shapeZ: rz,
+        shapeMix: 0,
       });
     }
   }
@@ -161,15 +199,80 @@ export class ParticleSystem {
       }
 
       // BASE PHYSICS (The "Chaos" drift)
+      if (p.role === "background") {
+        const friction = 0.985; // Only dampen background stars
+        p.vx *= friction;
+        p.vy *= friction;
+        p.vz *= friction;
+      }
+      // No friction for "shape" particles means they will continue at high speed forever until recycled/reused
+
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
 
+      // ATOMOSPHERIC DRIFT (Gentle Rotation)
+      if (p.role === "background") {
+        const rotSpeed = 0.06 * dt; // Increased for more dynamic feel
+        const cos = Math.cos(rotSpeed);
+        const sin = Math.sin(rotSpeed);
+        const nx = p.x * cos - p.z * sin;
+        const nz = p.x * sin + p.z * cos;
+        p.x = nx;
+        p.z = nz;
+      }
+      // The following block of code was provided in the instruction but appears to be
+      // logic for a controller that *uses* the ParticleSystem, not part of the
+      // ParticleSystem's internal update method. Inserting it here would cause
+      // syntax errors due to undeclared variables (shapeName, this.shapeGenerator, etc.).
+      // Therefore, it has been omitted to maintain a syntactically correct file.
+      /*
+      if (shapeName === "HEART_SHAPE") {
+      points = this.shapeGenerator.generateHeartPoints(0, 0, heartScale, 6000); 
+    } else {
+      const fontSize = shapeName.length > 5 ? baseFontSize * 0.8 : baseFontSize;
+      points = this.shapeGenerator.generateTextPoints(
+        shapeName,
+        0,
+        0,
+        fontSize,
+        8000, 
+      );
+    }
+      */
+      // ROLE BASED BEHAVIOR (Background Looping / Recycling)
+      if (p.role === "background") {
+        const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+        const limit = 2500;
+
+        // If a star drifts too far, "recycle" it to the edge with inward velocity
+        if (dist > limit) {
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          // Respawn at a distance that is visibly "entering" the frame (1800)
+          const spawnDist = 2000;
+          p.x = spawnDist * Math.sin(phi) * Math.cos(theta);
+          p.y = spawnDist * Math.sin(phi) * Math.sin(theta);
+          p.z = spawnDist * Math.cos(phi);
+
+          // Give it a clear inward push
+          const speed = 40 + Math.random() * 50;
+          p.vx = -(p.x / spawnDist) * speed;
+          p.vy = -(p.y / spawnDist) * speed;
+          p.vz = -(p.z / spawnDist) * speed;
+        }
+      }
+
       // BLENDED RENDERING
-      // If bloomMix > 0, we pull the visual position toward bloom target
-      const renderX = p.x * (1 - p.bloomMix) + p.bloomX * p.bloomMix;
-      const renderY = p.y * (1 - p.bloomMix) + p.bloomY * p.bloomMix;
-      const renderZ = p.z * (1 - p.bloomMix) + p.bloomZ * p.bloomMix;
+      // 1. Base / Shape Interpolation
+      let renderX = p.x * (1 - p.shapeMix) + p.shapeX * p.shapeMix;
+      let renderY = p.y * (1 - p.shapeMix) + p.shapeY * p.shapeMix;
+      let renderZ = p.z * (1 - p.shapeMix) + p.shapeZ * p.shapeMix;
+
+      // 2. Bloom Overlay (Secondary Blend)
+      renderX = renderX * (1 - p.bloomMix) + p.bloomX * p.bloomMix;
+      renderY = renderY * (1 - p.bloomMix) + p.bloomY * p.bloomMix;
+      renderZ = renderZ * (1 - p.bloomMix) + p.bloomZ * p.bloomMix;
 
       posAttr.array[i * 3] = renderX;
       posAttr.array[i * 3 + 1] = renderY;

@@ -89,6 +89,11 @@ export class App {
 
     this.shakeController.update(dt);
     this.bloomController.update(dt);
+
+    // Role-based coordinate
+    this.particleSystem.isInteracting =
+      this.shakeController.isShaking || this.bloomController.active;
+
     this.particleSystem.update(dt, this.mouse);
 
     // Use Composer for Bloom
