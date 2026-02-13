@@ -3,6 +3,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { ParticleSystem } from "./ParticleSystem.js";
+import { SceneBackground } from "./SceneBackground.js";
 import { ShakeController } from "../features/shake/ShakeController.js";
 import { BloomController } from "../features/bloom/BloomController.js";
 
@@ -42,6 +43,7 @@ export class App {
     this.composer.addPass(this.bloomPass);
 
     // 5. Core Modules
+    this.background = new SceneBackground(this.scene);
     this.particleSystem = new ParticleSystem(this.scene);
     this.shakeController = new ShakeController(this.particleSystem);
     this.bloomController = new BloomController(this.particleSystem);

@@ -144,11 +144,17 @@ export class ParticleSystem {
         vy = -(ry / radius) * speed;
         vz = -(rz / radius) * speed;
       } else {
-        // Shape stars start far away (hidden)
-        const angle = Math.random() * Math.PI * 2;
-        rx = Math.cos(angle) * 3000;
-        ry = Math.sin(angle) * 3000;
-        rz = (Math.random() - 0.5) * 1000;
+        // Shape stars start in chaos with a tiny random drift
+        const radius = 1000 + Math.random() * 1000;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        rx = radius * Math.sin(phi) * Math.cos(theta);
+        ry = radius * Math.sin(phi) * Math.sin(theta);
+        rz = radius * Math.cos(phi);
+
+        vx = (Math.random() - 0.5) * 20;
+        vy = (Math.random() - 0.5) * 20;
+        vz = (Math.random() - 0.5) * 20;
       }
 
       this.particles.push({
@@ -207,6 +213,10 @@ export class ParticleSystem {
         p.vx *= friction;
         p.vy *= friction;
         p.vz *= friction;
+      } else {
+        // Tiny ambient noise for shape particles to prevent them from being "dead" still
+        p.vx += (Math.random() - 0.5) * 0.1;
+        p.vy += (Math.random() - 0.5) * 0.1;
       }
       // No friction for "shape" particles means they will continue at high speed forever until recycled/reused
 
@@ -293,12 +303,10 @@ export class ParticleSystem {
       let scale = 0.6 + twinkle * 0.4;
 
       // GLOW BOOST + HEARTBEAT
-      if (p.bloomMix > 0.1) {
-        scale *= (1 + p.bloomMix * 0.6) * beatScale; // Pulse during bloom
-      } else if (p.state === "forming") {
-        scale *= 1.1 * beatScale; // Reduced from 1.4x to keep shapes sharp/less blurry
+      if (p.state === "blooming" || p.state === "forming") {
+        scale *= 1.1 * beatScale; // Uniform subtle glow for all interactive shapes
       } else if (p.state === "chaos") {
-        scale *= 3.0; // Increased significantly for mobile presence
+        scale *= 3.0; // Keep chaos stars prominent
       }
 
       sizeAttr.array[i] = p.baseSize * scale;

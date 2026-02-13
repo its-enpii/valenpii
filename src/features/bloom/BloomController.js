@@ -16,9 +16,14 @@ export class BloomController {
 
     // Use a subset of particles
     const isMobile = window.innerWidth < 600;
-    const totalShapes = Math.floor(this.particleSystem.maxParticles * 0.75);
-    this.poolStart = isMobile ? 3000 : 6000;
-    this.poolEnd = isMobile ? 6000 : 9000; // Tighter pool for a thinner look
+    // Initial guess, will be refined in init() to match point count
+    this.poolStart = isMobile ? 1000 : 2000;
+    this.poolEnd = this.poolStart + 4000;
+
+    // Safety check: ensure we don't exceed maxParticles
+    if (this.poolEnd > this.particleSystem.maxParticles) {
+      this.poolEnd = this.particleSystem.maxParticles;
+    }
 
     // Simulation for Desktop
     this.isMouseDown = false;
@@ -31,14 +36,21 @@ export class BloomController {
 
   async init() {
     const isMobile = window.innerWidth < 600;
-    const heartScale = isMobile ? 150 : 350; // Lowered from 180
+    const heartScale = isMobile ? 150 : 300; // Parity with Shake heart
 
+    const heartPoints = 4000;
     this.targetShapePoints = this.shapeGenerator.generateHeartPoints(
       0,
       0,
       heartScale,
-      2800, // Reduced density for a thinner, more elegant heart
+      heartPoints,
     );
+
+    // DENSITY FIX: Ensure pool size matches point count EXACTLY to prevent overlapping contrast
+    this.poolEnd = this.poolStart + heartPoints;
+    if (this.poolEnd > this.particleSystem.maxParticles) {
+      this.poolEnd = this.particleSystem.maxParticles;
+    }
 
     // Mobile Listeners
     window.addEventListener("touchstart", this.onTouchStart.bind(this), {
@@ -247,7 +259,7 @@ export class BloomController {
       this.lockCenter.y = this.touchCenter.y;
 
       gsap.to(this.bloomParticles, {
-        bloomMix: 1.5, // Over-bloom for a moment
+        bloomMix: 1.1, // Subtle pop instead of blinding burst
         duration: 0.3,
         yoyo: true,
         repeat: 1,
